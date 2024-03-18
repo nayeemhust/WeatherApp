@@ -16,7 +16,7 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
     @IBOutlet weak var tempSwitch: UISwitch!
     
     let locationManager = CLLocationManager()
-    var currentCity:String=""
+    var location:String=""
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -40,16 +40,15 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
         
     }
     
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations loc: [CLLocation]) {
+        guard let location = loc.last else {
             return
         }
         locationManager.stopUpdatingLocation()
-        
         let lat = location.coordinate.latitude
         let lon = location.coordinate.longitude
         
-        loadWeather(search: "\(lat),\(lon)", isCelsius: true)
+        getWeather(search: "\(lat),\(lon)", isCelsius: true)
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -57,11 +56,10 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
     }
     
     @IBAction func onSearchTapped(_ sender: UIButton) {
-        loadWeather(search: searchTextField.text, isCelsius: tempSwitch.isOn)
+        getWeather(search: searchTextField.text, isCelsius: tempSwitch.isOn)
         searchTextField.endEditing(true)
     }
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        print(searchTextField.text ?? "")
         searchTextField.endEditing(true)
         return true
     }
@@ -74,19 +72,19 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
     }
     
     func textFieldDidEndEditing(_ textField: UITextField) {
-        loadWeather(search: textField.text, isCelsius: tempSwitch.isOn)
+        getWeather(search: textField.text, isCelsius: tempSwitch.isOn)
         searchTextField.text = ""
     }
     
     
     @IBAction func switchController(_ sender: UISwitch) {
         
-        loadWeather(search: currentCity,isCelsius: tempSwitch.isOn)
+        getWeather(search: location,isCelsius: tempSwitch.isOn)
         
     }
     
     
-    private func loadWeather(search: String?, isCelsius: Bool) {
+    private func getWeather(search: String?, isCelsius: Bool) {
         guard let search = search, let url = getURL(query: search) else { return }
         
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
@@ -94,18 +92,27 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
             
             if let weatherResponse = self.parseJson(data: data) {
                 DispatchQueue.main.async {
+                    let current = weatherResponse.current
                     self.locationLabel.text = weatherResponse.location.name
-                    self.temperatureLabel.text = isCelsius ? "\(weatherResponse.current.temp_f)°F" : "\(weatherResponse.current.temp_c)°C"
-                    self.conditionLabel.text = weatherResponse.current.condition.text
-                    self.weatherCondition.image = self.getWeatherSymbol(conditionText: weatherResponse.current.condition.text, isDay: weatherResponse.current.is_day != 0)
+                    
+                    switch isCelsius {
+                    case true:
+                        self.temperatureLabel.text = "\(current.temp_f)°F"
+                    case false:
+                        self.temperatureLabel.text = "\(current.temp_c)°C"
+                    }
+                    
+                    self.conditionLabel.text = current.condition.text
+                    self.weatherCondition.image = self.getWeatherSFSymbol(conditionText: current.condition.text, isDay: current.is_day != 0)
                     self.localTimeLabel.text = weatherResponse.location.localtime
                 }
             }
         }.resume()
-        currentCity = search
+        
+        location = search
     }
     
-    private func getWeatherSymbol(conditionText: String, isDay: Bool) -> UIImage? {
+    private func getWeatherSFSymbol(conditionText: String, isDay: Bool) -> UIImage? {
         let lowercasedCondition = conditionText.lowercased()
         
         let weatherSymbols: [String: String] = [
@@ -197,9 +204,9 @@ struct CurrentWeather: Decodable {
     let temp_c: Float
     let temp_f: Float
     let is_day: Int
-    let condition: WeatherCondition
+    let condition: Condition
 }
 
-struct WeatherCondition: Decodable {
+struct Condition: Decodable {
     let text: String
 }
