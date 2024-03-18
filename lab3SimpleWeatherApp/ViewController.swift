@@ -20,13 +20,13 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        ImageDemo()
+        imageDemo()
         searchTextField.delegate = self
         locationManager.delegate = self
         locationManager.requestWhenInUseAuthorization()
-
+        
     }
-    private func ImageDemo() {
+    private func imageDemo() {
         let configuration = UIImage.SymbolConfiguration(paletteColors: [
             .systemRed, .systemTeal, .systemOrange
         ])
@@ -37,21 +37,24 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
     
     @IBAction func onLocationTapped(_ sender: UIButton) {
         locationManager.startUpdatingLocation()
-
+        
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-            if let location = locations.last {
-                locationManager.stopUpdatingLocation()
-                let lat = location.coordinate.latitude
-                let lon = location.coordinate.longitude
-                loadWeather(search: "\(lat),\(lon)", isCelsius: true)
-            }
+        guard let location = locations.last else {
+            return
         }
+        locationManager.stopUpdatingLocation()
         
-        func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-            print("Failed to find user's location: \(error.localizedDescription)")
-        }
+        let lat = location.coordinate.latitude
+        let lon = location.coordinate.longitude
+        
+        loadWeather(search: "\(lat),\(lon)", isCelsius: true)
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        //            print("Sorry, Not getting user's current location")
+    }
     
     @IBAction func onSearchTapped(_ sender: UIButton) {
         loadWeather(search: searchTextField.text, isCelsius: tempSwitch.isOn)
@@ -62,14 +65,14 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
         searchTextField.endEditing(true)
         return true
     }
-
+    
     func textFieldShouldEndEditing(_ textField: UITextField) -> Bool {
         if textField.text != "" { return true }
         
         textField.placeholder = "Please type the city name"
         return false
     }
-
+    
     func textFieldDidEndEditing(_ textField: UITextField) {
         loadWeather(search: textField.text, isCelsius: tempSwitch.isOn)
         searchTextField.text = ""
@@ -79,32 +82,32 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
     @IBAction func switchController(_ sender: UISwitch) {
         
         loadWeather(search: currentCity,isCelsius: tempSwitch.isOn)
-
+        
     }
-
+    
     
     private func loadWeather(search: String?, isCelsius: Bool) {
-            guard let search = search, let url = getURL(query: search) else { return }
+        guard let search = search, let url = getURL(query: search) else { return }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self = self, let data = data, error == nil else { return }
             
-            URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-                guard let self = self, let data = data, error == nil else { return }
-                
-                if let weatherResponse = self.parseJson(data: data) {
-                    DispatchQueue.main.async {
-                        self.locationLabel.text = weatherResponse.location.name
-                        self.temperatureLabel.text = isCelsius ? "\(weatherResponse.current.temp_f)°F" : "\(weatherResponse.current.temp_c)°C"
-                        self.conditionLabel.text = weatherResponse.current.condition.text
-                        self.weatherCondition.image = self.getWeatherSymbol(conditionText: weatherResponse.current.condition.text, isDay: weatherResponse.current.is_day != 0)
-                        self.localTimeLabel.text = weatherResponse.location.localtime
-                    }
+            if let weatherResponse = self.parseJson(data: data) {
+                DispatchQueue.main.async {
+                    self.locationLabel.text = weatherResponse.location.name
+                    self.temperatureLabel.text = isCelsius ? "\(weatherResponse.current.temp_f)°F" : "\(weatherResponse.current.temp_c)°C"
+                    self.conditionLabel.text = weatherResponse.current.condition.text
+                    self.weatherCondition.image = self.getWeatherSymbol(conditionText: weatherResponse.current.condition.text, isDay: weatherResponse.current.is_day != 0)
+                    self.localTimeLabel.text = weatherResponse.location.localtime
                 }
-            }.resume()
-            currentCity = search
-        }
+            }
+        }.resume()
+        currentCity = search
+    }
     
     private func getWeatherSymbol(conditionText: String, isDay: Bool) -> UIImage? {
         let lowercasedCondition = conditionText.lowercased()
-
+        
         let weatherSymbols: [String: String] = [
             "sunny": isDay ? "sun.max.fill" : "moon.fill",
             "partly cloudy": isDay ? "cloud.sun.fill" : "cloud.moon.fill",
@@ -164,19 +167,19 @@ class ViewController: UIViewController, UITextFieldDelegate, CLLocationManagerDe
         let apiKey = "d0ea15866c9448d492c221111241203"
         let urlString = "\(baseUrl)\(currentEndpoint)?key=\(apiKey)&q=\(query)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
         let url = urlString.flatMap { URL(string: $0) }
-//        print(url ?? "")
+        //        print(url ?? "")
         return url
     }
-
-
+    
+    
     private func parseJson(data: Data) -> Weather? {
         let decoder = JSONDecoder()
         let weather = try? decoder.decode(Weather.self, from: data)
         
         if weather == nil {
-//            print("Decoding error")
+            //            print("Sorry, having problems with decoding error")
         }
-            return weather
+        return weather
     }
 }
 
